@@ -60,7 +60,12 @@ export async function POST(request: NextRequest) {
     
     // Configure model based on operation type
     const modelConfig = {
-      model: modelName
+      model: modelName,
+      ...(modelName === "gemini-2.0-flash-exp" ? {
+        generationConfig: {
+          responseModalities: ["Text", "Image"]
+        }
+      } : {})
     };
     
     const model = genAI.getGenerativeModel(modelConfig);
