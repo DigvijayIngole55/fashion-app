@@ -212,11 +212,14 @@ export function getSuggestedIncrement(pomCode: string, sizeSystem: SizeSystemTyp
   
   // Suggest based on measurement type patterns
   if (codeUpper.includes('LENGTH') || codeUpper.includes('HEIGHT')) {
-    return MEASUREMENT_TYPE_SUGGESTIONS.length[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.length];
+    const suggestion = MEASUREMENT_TYPE_SUGGESTIONS.length[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.length];
+    return typeof suggestion === 'number' ? suggestion : 2.0;
   } else if (codeUpper.includes('WIDTH') || codeUpper.includes('CHEST') || codeUpper.includes('HIP')) {
-    return MEASUREMENT_TYPE_SUGGESTIONS.width[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.width];
+    const suggestion = MEASUREMENT_TYPE_SUGGESTIONS.width[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.width];
+    return typeof suggestion === 'number' ? suggestion : 3.0;
   } else {
-    return MEASUREMENT_TYPE_SUGGESTIONS.small[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.small];
+    const suggestion = MEASUREMENT_TYPE_SUGGESTIONS.small[`default${sizeSystem}` as keyof typeof MEASUREMENT_TYPE_SUGGESTIONS.small];
+    return typeof suggestion === 'number' ? suggestion : 0.4;
   }
 }
 
@@ -323,6 +326,7 @@ export function generateAllSizeCharts(
   baseSize: SizeValue,
   customGradingRules?: GradingRules
 ): Record<SizeSystemType, { chart: SizeChart; systemConfig: SizeSystemConfig }> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result: Record<string, any> = {};
   
   for (const [systemKey, systemConfig] of Object.entries(SIZE_SYSTEMS)) {
@@ -437,6 +441,7 @@ export async function createComprehensiveExport(
   baseSize: SizeValue,
   generatedSketches: Array<{ id: string; originalName: string; sketchUrl: string | null }>,
   labeledSketches: Array<{ id: string; sketchId: string; labeledImageUrl: string | null }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customizedSketches: Array<{ id: string; originalImageName: string; customizedImageUrl: string | null; customizations: any }>,
   originalImage?: { name: string; preview: string },
   customGradingRules?: GradingRules
@@ -455,7 +460,7 @@ export async function createComprehensiveExport(
   // Add size charts for all systems
   const sizeChartsFolder = zip.folder('size-charts');
   if (sizeChartsFolder) {
-    for (const [systemKey, { chart, systemConfig }] of Object.entries(allSizeCharts)) {
+    for (const [systemKey, { chart }] of Object.entries(allSizeCharts)) {
       const sizeSystem = systemKey as SizeSystemType;
       const csvContent = exportSizeChartAsCSV(chart, pomData, sizeSystem, mapSizeAcrossSystems(baseSize, baseSizeSystem, sizeSystem));
       sizeChartsFolder.file(`${systemKey}-size-chart.csv`, csvContent);

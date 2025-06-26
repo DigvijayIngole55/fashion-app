@@ -44,10 +44,7 @@ export async function POST(request: NextRequest) {
     // Initialize Google Generative AI
     const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        responseModalities: ["Text", "Image"]
-      }
+      model: "gemini-2.0-flash-exp"
     });
 
     // Convert base image to base64
@@ -62,6 +59,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Prepare content parts
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contentParts: any[] = [];
 
     // Build customization prompt

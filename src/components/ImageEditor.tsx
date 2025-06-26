@@ -76,7 +76,7 @@ export default function ImageEditor({ images }: ImageEditorProps) {
         originalId: selectedImage,
         originalName: image.name,
         style: styleToUse,
-        editedUrl: response.output_url,
+        editedUrl: response.output_url || '',
         timestamp: new Date(),
       };
 

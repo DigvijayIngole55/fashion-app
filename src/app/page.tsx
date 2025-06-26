@@ -2,17 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { editImageWithStyle } from '@/lib/deepaiApi';
-import { AI_PROMPTS, getPomLabelingPrompt, EXAMPLE_POM_LABELS } from '@/lib/prompts';
+import { AI_PROMPTS, getPomLabelingPrompt } from '@/lib/prompts';
 import GarmentCustomizer from '@/components/GarmentCustomizer';
 import { 
   parsePOMInput, 
   generateSizeChart, 
   extractPOMForLabeling, 
-  formatSizeChartForDisplay,
   exportSizeChartAsCSV,
-  getDefaultGradingRules,
   getSuggestedIncrement,
-  validateGradingRules,
   createComprehensiveExport,
   SIZE_SYSTEMS,
   type SizeSystemType,
@@ -420,6 +417,7 @@ export default function Home() {
     baseSize, 
     generatedSketches, 
     labeledSketches, 
+    customizedSketches,
     uploadedImage, 
     customGradingRules
   ]);
@@ -984,7 +982,7 @@ B    ½ Chest    54`}
                   rows={6}
                 />
                 <p className="text-xs text-gray-400 mt-2">
-                  Enter measurements for your base size ({baseSize}). Format: "Code - Description - Measurement" or table format.
+                  Enter measurements for your base size ({baseSize}). Format: &quot;Code - Description - Measurement&quot; or table format.
                 </p>
                 
                 {/* Grading Rules Editor */}
