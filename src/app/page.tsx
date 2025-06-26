@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { editImageWithStyle } from '@/lib/deepaiApi';
 import { AI_PROMPTS, getPomLabelingPrompt, EXAMPLE_POM_LABELS } from '@/lib/prompts';
+import GarmentCustomizer from '@/components/GarmentCustomizer';
 import { 
   parsePOMInput, 
   generateSizeChart, 
@@ -45,6 +46,18 @@ interface LabeledSketch {
   timestamp: Date;
 }
 
+interface CustomizedSketch {
+  id: string;
+  originalImageName: string;
+  customizedImageUrl: string | null;
+  customizations: {
+    color?: string;
+    hasTexture: boolean;
+    hasLogo: boolean;
+  };
+  timestamp: Date;
+}
+
 export default function Home() {
   const [uploadedImage, setUploadedImage] = useState<UploadedImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -63,6 +76,9 @@ export default function Home() {
   const [customGradingRules, setCustomGradingRules] = useState<GradingRules>({});
   const [showGradingEditor, setShowGradingEditor] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [customizedSketches, setCustomizedSketches] = useState<CustomizedSketch[]>([]);
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'sketching' | 'customize'>('sketching');
 
   const processFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -285,6 +301,78 @@ export default function Home() {
     }
   }, [parsedPOMData, baseSize, sizeSystem]);
 
+  // Garment customization function
+  const customizeGarment = useCallback(async (options: { color?: string; textureImage?: File; logoImage?: File }) => {
+    if (!uploadedImage) {
+      alert('No original image available for customization.');
+      return;
+    }
+
+    setIsCustomizing(true);
+
+    try {
+      console.log('🎨 [CUSTOMIZATION] Starting garment customization...');
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('baseImage', uploadedImage.file);
+
+      if (options.color) {
+        formData.append('color', options.color);
+        console.log('🎨 [CUSTOMIZATION] Color:', options.color);
+      }
+
+      if (options.textureImage) {
+        formData.append('textureImage', options.textureImage);
+        console.log('🧵 [CUSTOMIZATION] Texture:', options.textureImage.name);
+      }
+
+      if (options.logoImage) {
+        formData.append('logoImage', options.logoImage);
+        console.log('🏷️ [CUSTOMIZATION] Logo:', options.logoImage.name);
+      }
+
+      console.log('📤 [CUSTOMIZATION] Sending request to API...');
+
+      const response = await fetch('/api/customize-garment', {
+        method: 'POST',
+        body: formData
+      });
+
+      console.log('📨 [CUSTOMIZATION] API response received, status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ [CUSTOMIZATION] API Error:', errorData);
+        throw new Error(`Customization failed: ${errorData.error}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ [CUSTOMIZATION] Success:', data);
+
+      if (data.success && data.customizedImageUrl) {
+        const newCustomizedSketch: CustomizedSketch = {
+          id: Math.random().toString(36).substring(2, 11),
+          originalImageName: uploadedImage.name,
+          customizedImageUrl: data.customizedImageUrl,
+          customizations: data.customizations,
+          timestamp: new Date()
+        };
+
+        setCustomizedSketches(prev => [newCustomizedSketch, ...prev]);
+        console.log('💾 [CUSTOMIZATION] Customized sketch added to state');
+      } else {
+        throw new Error('Invalid response from customization API');
+      }
+
+    } catch (error) {
+      console.error('💥 [CUSTOMIZATION] Error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to customize garment. Please try again.');
+    } finally {
+      setIsCustomizing(false);
+    }
+  }, [uploadedImage]);
+
   // Comprehensive export function
   const exportComprehensivePackage = useCallback(async () => {
     if (parsedPOMData.length === 0) {
@@ -303,6 +391,7 @@ export default function Home() {
         baseSize,
         generatedSketches,
         labeledSketches,
+        customizedSketches,
         uploadedImage ? { name: uploadedImage.name, preview: uploadedImage.preview } : undefined,
         Object.keys(customGradingRules).length > 0 ? customGradingRules : undefined
       );
@@ -476,7 +565,7 @@ export default function Home() {
             </div>
             
             {/* Comprehensive Export Button */}
-            {(parsedPOMData.length > 0 || generatedSketches.length > 0) && (
+            {(parsedPOMData.length > 0 || generatedSketches.length > 0 || customizedSketches.length > 0) && (
               <div className="mt-4 lg:mt-0">
                 <button
                   onClick={exportComprehensivePackage}
@@ -588,41 +677,188 @@ export default function Home() {
             )}
           </section>
 
-          {/* Generate Button */}
-          <section>
-            <button
-              onClick={generateSketch}
-              disabled={!uploadedImage || isGenerating}
-              className={`
-                w-full px-6 py-4 rounded-lg font-medium text-lg transition-colors
-                ${!uploadedImage || isGenerating
-                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-                }
-              `}
-            >
-              {isGenerating ? 'Generating Technical Sketch...' : 'Generate Technical Sketch'}
-            </button>
-
-            {/* Progress Bar */}
-            {isGenerating && (
-              <div className="mt-4">
-                <div className="flex justify-between text-sm text-gray-400 mb-2">
-                  <span>Processing garment image...</span>
-                  <span>{Math.round(currentProgress)}%</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${currentProgress}%` }}
-                  />
-                </div>
+          {/* Tab Navigation - Only show after image upload */}
+          {uploadedImage && (
+            <section>
+              <div className="flex flex-col sm:flex-row gap-2 mb-8">
+                <button
+                  onClick={() => setActiveTab('sketching')}
+                  className={`
+                    flex-1 py-4 px-6 rounded-lg font-medium transition-all duration-200 text-left
+                    ${activeTab === 'sketching'
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">✏️</div>
+                    <div>
+                      <div className="text-lg font-semibold">Technical Sketching</div>
+                      <div className="text-sm opacity-75">
+                        Generate sketches, add POM labels, create size charts
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('customize')}
+                  className={`
+                    flex-1 py-4 px-6 rounded-lg font-medium transition-all duration-200 text-left
+                    ${activeTab === 'customize'
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">🎨</div>
+                    <div>
+                      <div className="text-lg font-semibold">Garment Customize</div>
+                      <div className="text-sm opacity-75">
+                        Change colors, add textures, apply logos
+                      </div>
+                    </div>
+                  </div>
+                </button>
               </div>
-            )}
-          </section>
+            </section>
+          )}
+
+          {/* Tab Content */}
+          {uploadedImage && activeTab === 'sketching' && (
+            <>
+              {/* Generate Button */}
+              <section>
+                <button
+                  onClick={generateSketch}
+                  disabled={!uploadedImage || isGenerating}
+                  className={`
+                    w-full px-6 py-4 rounded-lg font-medium text-lg transition-colors
+                    ${!uploadedImage || isGenerating
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                    }
+                  `}
+                >
+                  {isGenerating ? 'Generating Technical Sketch...' : 'Generate Technical Sketch'}
+                </button>
+
+                {/* Progress Bar */}
+                {isGenerating && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-gray-400 mb-2">
+                      <span>Processing garment image...</span>
+                      <span>{Math.round(currentProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${currentProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+
+          {/* Stage 2: Garment Customization */}
+          {uploadedImage && activeTab === 'customize' && (
+            <section>
+              <GarmentCustomizer
+                originalImageUrl={uploadedImage.preview}
+                originalImageName={uploadedImage.name}
+                onCustomize={customizeGarment}
+                isCustomizing={isCustomizing}
+              />
+            </section>
+          )}
+
+          {/* Customized Garments Display */}
+          {customizedSketches.length > 0 && activeTab === 'customize' && (
+            <section>
+              <h2 className="text-2xl font-semibold text-white mb-6">
+                Customized Garments
+              </h2>
+              <div className="space-y-6">
+                {customizedSketches.map((customized) => (
+                  <div key={customized.id} className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* Customized Image */}
+                      <div className="flex-1">
+                        <h4 className="text-md font-medium text-white mb-2">Customized Design</h4>
+                        {customized.customizedImageUrl ? (
+                          <img
+                            src={customized.customizedImageUrl}
+                            alt={`Customized ${customized.originalImageName}`}
+                            className="w-full max-w-sm h-64 object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-full max-w-sm h-64 bg-gray-700 rounded-lg flex items-center justify-center">
+                            <span className="text-gray-400">Failed to load</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Customization Details */}
+                      <div className="flex-1">
+                        <h4 className="text-md font-medium text-white mb-3">Applied Customizations</h4>
+                        <div className="space-y-2">
+                          {customized.customizations.color && (
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-4 h-4 rounded border border-gray-500"
+                                style={{ backgroundColor: customized.customizations.color }}
+                              />
+                              <span className="text-gray-300 text-sm">Color: {customized.customizations.color}</span>
+                            </div>
+                          )}
+                          {customized.customizations.hasTexture && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-green-400">🎨</span>
+                              <span className="text-gray-300 text-sm">Custom fabric texture applied</span>
+                            </div>
+                          )}
+                          {customized.customizations.hasLogo && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-blue-400">🏷️</span>
+                              <span className="text-gray-300 text-sm">Logo added</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="mt-4">
+                          <button
+                            onClick={() => {
+                              if (customized.customizedImageUrl) {
+                                const link = document.createElement('a');
+                                link.href = customized.customizedImageUrl;
+                                link.download = `customized-${customized.originalImageName}`;
+                                link.click();
+                              }
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          >
+                            Download
+                          </button>
+                        </div>
+
+                        <div className="mt-3 text-xs text-gray-400">
+                          Created: {customized.timestamp.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
 
           {/* POM Labels Input */}
-          {generatedSketches.length > 0 && (
+          {generatedSketches.length > 0 && activeTab === 'sketching' && (
             <section>
               <h2 className="text-2xl font-semibold text-white mb-6">
                 Enter POM Labels
@@ -870,7 +1106,7 @@ B    ½ Chest    54`}
           )}
 
           {/* Generated Sketches */}
-          {generatedSketches.length > 0 && (
+          {generatedSketches.length > 0 && activeTab === 'sketching' && (
             <section>
               <h2 className="text-2xl font-semibold text-white mb-6">
                 Generated Technical Sketches
@@ -950,7 +1186,7 @@ B    ½ Chest    54`}
           )}
 
           {/* Labeled Sketches */}
-          {labeledSketches.length > 0 && (
+          {labeledSketches.length > 0 && activeTab === 'sketching' && (
             <section>
               <h2 className="text-2xl font-semibold text-white mb-6">
                 POM Labeled Technical Sketches

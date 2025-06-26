@@ -437,6 +437,7 @@ export async function createComprehensiveExport(
   baseSize: SizeValue,
   generatedSketches: Array<{ id: string; originalName: string; sketchUrl: string | null }>,
   labeledSketches: Array<{ id: string; sketchId: string; labeledImageUrl: string | null }>,
+  customizedSketches: Array<{ id: string; originalImageName: string; customizedImageUrl: string | null; customizations: any }>,
   originalImage?: { name: string; preview: string },
   customGradingRules?: GradingRules
 ): Promise<Blob> {
@@ -504,6 +505,24 @@ export async function createComprehensiveExport(
             labeledFolder.file(fileName, labeledBlob);
           } catch (error) {
             console.warn(`Failed to add labeled sketch ${labeled.id} to export:`, error);
+          }
+        }
+      }
+    }
+  }
+  
+  // Add customized sketches
+  if (customizedSketches.length > 0) {
+    const customizedFolder = zip.folder('customized-garments');
+    if (customizedFolder) {
+      for (const customized of customizedSketches) {
+        if (customized.customizedImageUrl) {
+          try {
+            const customizedBlob = await urlToBlob(customized.customizedImageUrl);
+            const fileName = `customized-${customized.originalImageName}-${customized.id}.png`;
+            customizedFolder.file(fileName, customizedBlob);
+          } catch (error) {
+            console.warn(`Failed to add customized sketch ${customized.id} to export:`, error);
           }
         }
       }
