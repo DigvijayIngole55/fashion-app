@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       ...(modelName === "gemini-2.0-flash-exp" ? {
         generationConfig: {
           responseModalities: ["Text", "Image"]
-        }
+        } as any
       } : {})
     };
     

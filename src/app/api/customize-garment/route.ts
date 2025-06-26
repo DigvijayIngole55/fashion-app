@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       model: "gemini-2.0-flash-exp",
       generationConfig: {
         responseModalities: ["Text", "Image"]
-      }
+      } as any
     });
 
     // Convert base image to base64
